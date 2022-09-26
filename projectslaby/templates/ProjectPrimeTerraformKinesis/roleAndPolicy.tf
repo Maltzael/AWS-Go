@@ -1,8 +1,7 @@
 locals {
-  iamRoleName = "aimRole"
-  policyLogName = "allowLog"
+  iamRoleName       = "aimRole"
+  policyLogName     = "allowLog"
   policyKinesisName = "allowKinesis"
-
 }
 
 
@@ -17,8 +16,8 @@ terraform {
 
 provider "aws" {
   region = var.awsRegion
-
 }
+
 ################# 1 role ##################
 resource "aws_iam_role" "iamRole" {
   name = local.iamRoleName
@@ -41,7 +40,7 @@ EOF
 }
 
 resource "aws_iam_policy" "allow_logging" {
-  name        =  local.policyLogName
+  name        = local.policyLogName
   description = "IAM policy for logging from a lambda"
 
   policy = <<EOF

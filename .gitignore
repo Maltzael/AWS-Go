@@ -1,3 +1,6 @@
+#skip IntelIJ folder
+./idea/*
+
 # Local .terraform directories
 **/.terraform/*
 

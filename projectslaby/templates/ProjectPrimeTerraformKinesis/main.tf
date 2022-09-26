@@ -3,12 +3,19 @@ locals {
   fileNamePathLambda1 = "${path.module}/python/lambdaReciver.zip"
   fileNamePathLambda2 = "${path.module}/python/lambdaEvent.zip"
   lambda1Name         = "lambdaReceiver"
+  lambda1Description  = ""
+  lambda1Size         = ""
+  lambda1Trace        = true
   lambda2Name         = "lambdaEvent"
   handler1            = "lambdaReceiver.lambdaReceiver"
   handler2            = "lambdaEvent.lambdaEvent"
   runtime             = "python3.9"
   typeForArchive      = "zip"
   sourceDirArchive    = "${path.module}/python/"
+  SFTPhost            = ""
+  SFTPuser            = ""
+  SFTPpass            = ""
+
 
   ##### kinesis variables #####
   kinesisName       = "kinesis_stream"
@@ -33,13 +40,47 @@ locals {
 
 }
 
-###### 2 lambdas  and 2 archives ########
+########################### 2 lambdas  and 2 archives ###############################
 resource "aws_lambda_function" "lambdaReceiver" {
   filename      = local.fileNamePathLambda1
   function_name = local.lambda1Name
   role          = aws_iam_role.iamRole.arn
   handler       = local.handler1
   runtime       = local.runtime
+
+}
+
+module detailedvendorledgerentry_vn_lambda {
+  source = "git@github.com:xiatechs/sdv-terraform-aws-lambda.git?ref=v1"
+
+  //stack_name                                     = local.stackName // nazwa klocka
+  lambda_function_name                           = local.lambda1Name
+  //lambda_function_handler                        = local.dynamoReceiverLambdaVN // zastanowic sie co z tym zrobic
+  lambda_function_memory_size                    = local.lambda1Size
+  lambda_function_name_prefix                    = ""
+  lambda_function_description                    = local.lambda1Description
+  lambda_function_enabled                        = true
+  lambda_function_alarms_enabled                 = true
+  lambda_function_enable_vpc_config              = true
+  lambda_function_reserved_concurrent_executions = -1
+  lambda_function_vpc_config                     = var.lambda_function_vpc_config
+  lambda_function_kms_key_arn                    = var.lambda_function_kms_key_arn
+  lambda_function_sns_topic_monitoring_arn       = var.lambda_function_sns_topic_monitoring_arn
+  lambda_function_source_base_path               = var.lambda_function_source_base_path
+  lambda_function_env_vars                       = merge(var.lambda_function_env_vars, {
+    TRACE : local.lambda1Trace,
+    SFTP_HOST : local.SFTPhost,
+    SFTP_USER : local.SFTPuser,
+    SFTP : local.SFTPpass,
+
+    //TARGET_STREAM : "${local.kinesisStreamName}",    //bardzo potrzebne
+    SWALLOW_EVENTS : ""
+  })
+  lambda_function_existing_execute_role = var.lambda_function_existing_execute_role
+  account_id                            = local.account_id
+  client                                = local.client
+  environment                           = local.environment
+  region                                = local.region
 }
 
 resource "aws_lambda_function" "lambdaEvent" {
