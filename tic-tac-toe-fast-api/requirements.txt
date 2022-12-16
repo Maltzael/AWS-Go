@@ -1,8 +1,0 @@
-uvicorn
-sqlalchemy
-passlib
-python-jose
-cryptography
-python-multipart
-fastapi-versioning
-pip install email-validator
