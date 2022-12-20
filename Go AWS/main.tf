@@ -21,6 +21,14 @@ locals {
     "OutgoingRecords",
   ]
   startingPosition = "LATEST"
+  #s3 and trigger
+  bucketName    = "1234bucket-for-lambda-original-name"
+  bucketAcl     = "private"
+  eventsTrigger = ["s3:ObjectCreated:*"]
+  statementId               = "AllowS3Invoke"
+  actionInvoke              = "lambda:InvokeFunction"
+  principalInvoke           = "s3.amazonaws.com"
+  sourceArn                 = "arn:aws:s3:::${aws_s3_bucket.bucket_lambda_data.id}"
 
 }
 
@@ -70,4 +78,30 @@ resource "aws_lambda_event_source_mapping" "kinesis_to_lambda" {
   depends_on        = [
     aws_iam_role_policy_attachment.kinesis_processing
   ]
+}
+
+### 1 s3 and trigger to lambda ###
+resource "aws_s3_bucket" "bucket_lambda_data" {
+  bucket = local.bucketName
+}
+
+resource "aws_s3_bucket_acl" "acl_bucket" {
+  bucket = aws_s3_bucket.bucket_lambda_data.id
+  acl    = local.bucketAcl
+}
+
+resource "aws_s3_bucket_notification" "aws-s3-lambda-trigger" {
+  bucket = aws_s3_bucket.bucket_lambda_data.id
+  lambda_function {
+    lambda_function_arn = aws_lambda_function.lambda_ST.arn
+    events              = local.eventsTrigger
+
+  }
+}
+resource "aws_lambda_permission" "permission_s3_trigger" {
+  statement_id  = local.statementId
+  action        = local.actionInvoke
+  function_name = aws_lambda_function.lambda_ST.function_name
+  principal     = local.principalInvoke
+  source_arn    = local.sourceArn
 }
