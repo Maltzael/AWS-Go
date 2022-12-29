@@ -4,6 +4,7 @@ locals {
   policyLogName = "allow_logging"
   policyKinesisName = "allow_kinesis"
   policyS3Name = "allow_s3"
+  statementIdApi = "AllowAPIgatewayInvokation"
 }
 
 
@@ -118,6 +119,13 @@ resource "aws_iam_policy" "allow_kinesis" {
   ]
 }
 EOF
+}
+
+resource "aws_lambda_permission" "allow_api" {
+  statement_id  = local.statementIdApi
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.lambda_RC_api.function_name
+  principal     = "apigateway.amazonaws.com"
 }
 
 
