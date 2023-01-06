@@ -121,12 +121,19 @@ resource "aws_iam_policy" "allow_kinesis" {
 EOF
 }
 
-resource "aws_lambda_permission" "allow_api" {
+resource "aws_lambda_permission" "allow_api_lambda_api" {
   statement_id  = local.statementIdApi
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.lambda_RC_api.function_name
+  function_name = aws_lambda_function.lambda_RC_from_api.function_name
   principal     = "apigateway.amazonaws.com"
 }
+resource "aws_lambda_permission" "allow_api_lambda_auth" {
+  statement_id  = local.statementIdApi
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.lambda_RC_auth.function_name
+  principal     = "apigateway.amazonaws.com"
+}
+
 
 
 ################# 2 policy attachment ##################3
