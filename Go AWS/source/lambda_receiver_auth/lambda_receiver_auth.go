@@ -11,12 +11,12 @@ import (
 	"time"
 )
 
-var expirationTimeDuration = time.Hour * 1
+var expirationTimeDuration = time.Hour * 3
 
 type PostInput struct {
 	User  *string `json:"user"`
 	Email *string `json:"email"`
-	Data  *string `json:"data"`
+	Data  string  `json:"data"`
 }
 
 func GenerateJWT(email string, username string) (tokenString string, expTime time.Time, err error) {
@@ -30,7 +30,6 @@ func GenerateJWT(email string, username string) (tokenString string, expTime tim
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err = token.SignedString(service.JwtKey)
-	log.Print(tokenString)
 	return tokenString, expirationTime, err
 }
 
@@ -40,13 +39,12 @@ func lambdaMain(ctx context.Context, request events.APIGatewayProxyRequest) (eve
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
-	//log.Printf(*postInput.User, *postInput.Email, postInput.Data)
 	token, expTime, err := GenerateJWT(*postInput.Email, *postInput.User)
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
 	body, err := json.Marshal(service.ResponseBody{Token: token, ExpirationTime: expTime, Data: postInput.Data})
-	log.Print(token, expTime, postInput.Data)
+	log.Print("Body in json:", string(body))
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}

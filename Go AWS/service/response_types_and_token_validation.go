@@ -11,7 +11,7 @@ import (
 type ResponseBody struct {
 	Token          string    `json:"token"`
 	ExpirationTime time.Time `json:"expirationTime"`
-	Data           *string   `json:"data"`
+	Data           string    `json:"data"`
 }
 
 type JWTClaim struct {
