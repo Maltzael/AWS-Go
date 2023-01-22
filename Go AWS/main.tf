@@ -29,52 +29,75 @@ locals {
     "OutgoingRecords",
   ]
 
-  startingPosition = "LATEST"
+  startingPosition       = "LATEST"
   #s3 and trigger
-  bucketName       = "1234bucket-for-lambda-original-name"
-  bucketAcl        = "private"
-  eventsTrigger    = ["s3:ObjectCreated:*"]
-  statementId      = "AllowS3Invoke"
-  actionInvoke     = "lambda:InvokeFunction"
-  principalInvoke  = "s3.amazonaws.com"
-  sourceArn        = "arn:aws:s3:::${aws_s3_bucket.bucket_lambda_data.id}"
+  bucketName             = "1234bucket-for-lambda-original-name"
+  bucketAcl              = "private"
+  eventsTrigger          = ["s3:ObjectCreated:*"]
+  statementId            = "AllowS3Invoke"
+  actionInvoke           = "lambda:InvokeFunction"
+  principalInvoke        = "s3.amazonaws.com"
+  sourceArn              = "arn:aws:s3:::${aws_s3_bucket.bucket_lambda_data.id}"
   #api gateway
-  nameApiGateway   = "API Gateway post"
-  stageName        = "test"
+  nameApiGateway         = "API Gateway post"
+  stageName              = "test"
+  #documentDb
+  //change for var later\
+  clusterId              = "my-docdb-cluster"
+  engineDocumentDb       = "docdb"
+  userNameDocumentDb     = "someusername"
+  passwordDocumentDb     = "somepassword123"
+  vpcCidrBlock           = "10.0.0.0/16"
+  projectNameForVpc      = "vpc_main"
+  subnetPublicCidrBlock  = "10.0.0.0/21"
+  subnetPrivateCidrBlock = "10.0.8.0/21"
+  subnets_private_ids = [for subnet in aws_subnet.private_subnet : subnet.id]
+  subnets_public_ids = [for subnet in aws_subnet.public_subnet : subnet.id]
+
 }
 
 
 ### 4 lambda and 4 archives for lambda ###
 resource "aws_lambda_function" "lambda_ST" {
-  filename      = data.archive_file.zip_the_go_lambda1.output_path
-  function_name = local.lambda1Name
-  role          = aws_iam_role.iam_for_lambda.arn
-  handler       = local.handler1
-  runtime       = local.runtime
+  filename         = data.archive_file.zip_the_go_lambda1.output_path
+  function_name    = local.lambda1Name
+  role             = aws_iam_role.iam_for_lambda.arn
+  handler          = local.handler1
+  runtime          = local.runtime
+  source_code_hash = data.archive_file.zip_the_go_lambda1.output_base64sha256
 }
 
 resource "aws_lambda_function" "lambda_RC" {
-  filename      = data.archive_file.zip_the_go_lambda2.output_path
-  function_name = local.lambda2Name
-  role          = aws_iam_role.iam_for_lambda.arn
-  handler       = local.handler2
-  runtime       = local.runtime
+  filename         = data.archive_file.zip_the_go_lambda2.output_path
+  function_name    = local.lambda2Name
+  role             = aws_iam_role.iam_for_lambda.arn
+  handler          = local.handler2
+  runtime          = local.runtime
+  source_code_hash = data.archive_file.zip_the_go_lambda2.output_base64sha256
 }
 
 resource "aws_lambda_function" "lambda_RC_auth" {
-  filename      = data.archive_file.zip_the_go_lambda3.output_path
-  function_name = local.lambda3Name
-  role          = aws_iam_role.iam_for_lambda.arn
-  handler       = local.handler3
-  runtime       = local.runtime
+  filename         = data.archive_file.zip_the_go_lambda3.output_path
+  function_name    = local.lambda3Name
+  role             = aws_iam_role.iam_for_lambda.arn
+  handler          = local.handler3
+  runtime          = local.runtime
+  timeout          = 150
+  source_code_hash = data.archive_file.zip_the_go_lambda3.output_base64sha256
+  vpc_config {
+    subnet_ids         = [for subnet in aws_subnet.private_subnet : subnet.id]
+    security_group_ids = [aws_default_security_group.default_security_group.id]
+  }
 }
 
 resource "aws_lambda_function" "lambda_RC_from_api" {
-  filename      = data.archive_file.zip_the_go_lambda4.output_path
-  function_name = local.lambda4Name
-  role          = aws_iam_role.iam_for_lambda.arn
-  handler       = local.handler4
-  runtime       = local.runtime
+  filename         = data.archive_file.zip_the_go_lambda4.output_path
+  function_name    = local.lambda4Name
+  role             = aws_iam_role.iam_for_lambda.arn
+  handler          = local.handler4
+  runtime          = local.runtime
+  source_code_hash = data.archive_file.zip_the_go_lambda4.output_base64sha256
+
 }
 
 
@@ -226,4 +249,204 @@ resource "aws_api_gateway_stage" "deployment" {
 output "complete_invoke_url" {
   value = "${aws_api_gateway_deployment.deployment1.invoke_url}${aws_api_gateway_stage.deployment.stage_name}/${aws_api_gateway_resource.auth.path_part}\n${aws_api_gateway_deployment.deployment1.invoke_url}${aws_api_gateway_stage.deployment.stage_name}/${aws_api_gateway_resource.receiver.path_part}"
 
+}
+
+### DocumentDB deployment and vpc with subnets###
+resource "aws_docdb_cluster" "docDb" {
+  cluster_identifier      = local.clusterId
+  engine                  = local.engineDocumentDb
+  master_username         = local.userNameDocumentDb
+  master_password         = local.passwordDocumentDb
+  backup_retention_period = 5
+  preferred_backup_window = "07:00-09:00"
+  skip_final_snapshot     = true
+  db_subnet_group_name    = aws_docdb_subnet_group.subnet_group_docDb.name
+  vpc_security_group_ids  = [aws_default_security_group.default_security_group.id]
+}
+
+resource "aws_docdb_cluster_instance" "cluster_instances" {
+  count              = 1
+  identifier         = "docdb-cluster-demo-${count.index}"
+  cluster_identifier = aws_docdb_cluster.docDb.id
+  instance_class     = "db.t3.medium"
+}
+
+resource "aws_vpc" "vpc" {
+  cidr_block = local.vpcCidrBlock
+  tags       = {
+    Name = local.projectNameForVpc
+  }
+}
+
+#resource "aws_subnet" "subnet_public" {
+#  vpc_id                  = aws_vpc.vpc.id
+#  cidr_block              = local.subnetPublicCidrBlock
+#  map_public_ip_on_launch = true
+#  tags                    = {
+#    Name = "${local.projectNameForVpc}-subnet-public"
+#  }
+#}
+
+resource "aws_docdb_subnet_group" "subnet_group_docDb" {
+  subnet_ids = local.subnets_private_ids
+  tags       = {
+    Name = "subnet_group_docDb"
+  }
+}
+
+resource "aws_internet_gateway" "internet_gateway" {
+  vpc_id = aws_vpc.vpc.id
+
+  tags = {
+    Name = "${local.projectNameForVpc}-internet-gateway"
+  }
+}
+
+resource "aws_route_table" "route_table_public" {
+  vpc_id = aws_vpc.vpc.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.internet_gateway.id
+  }
+
+  tags = {
+    Name = "${local.projectNameForVpc}-route-table-public"
+  }
+}
+
+resource "aws_route_table_association" "route_table_association_public" {
+  count                   = length(data.aws_availability_zones.available.names)
+  subnet_id      = local.subnets_public_ids[count.index]
+  route_table_id = aws_route_table.route_table_public.id
+}
+
+resource "aws_eip" "eip" {
+  vpc        = true
+  depends_on = [aws_internet_gateway.internet_gateway]
+  tags       = {
+    Name = "${local.projectNameForVpc}-eip"
+  }
+}
+#resource "aws_nat_gateway" "nat_gateway" {
+#  allocation_id = aws_eip.eip.id
+#  subnet_id     = aws_subnet.subnet_public.id
+#
+#  tags = {
+#    Name = "${local.projectNameForVpc}-nat-gateway"
+#  }
+#}
+data "aws_availability_zones" "available" {
+
+}
+
+resource "aws_subnet" "public_subnet" {
+  count                   = length(data.aws_availability_zones.available.names)
+  vpc_id                  = aws_vpc.vpc.id
+  cidr_block              = "10.0.${10+count.index}.0/24"
+  availability_zone       = data.aws_availability_zones.available.names[count.index]
+  map_public_ip_on_launch = true
+  tags                    = {
+    Name = "PublicSubnet"
+  }
+}
+resource "aws_subnet" "private_subnet" {
+  count                   = length(data.aws_availability_zones.available.names)
+  vpc_id                  = aws_vpc.vpc.id
+  cidr_block              = "10.0.${20+count.index}.0/24"
+  availability_zone       = data.aws_availability_zones.available.names[count.index]
+  map_public_ip_on_launch = false
+  tags                    = {
+    Name = "PrivateSubnet"
+  }
+}
+#resource "aws_route_table" "route_table_private" {
+#  vpc_id = aws_vpc.vpc.id
+#
+#  route {
+#    cidr_block     = "0.0.0.0/0"
+#    nat_gateway_id = aws_nat_gateway.nat_gateway.id
+#  }
+#
+#  tags = {
+#    Name = "${local.projectNameForVpc}-route-table-private"
+#  }
+#}
+
+#resource "aws_route_table_association" "route_table_association_private" {
+#  subnet_id      = aws_subnet.subnet_private.id
+#  route_table_id = aws_route_table.route_table_private.id
+#}
+
+#
+#resource "aws_default_network_acl" "default_network_acl" {
+#  default_network_acl_id = aws_vpc.vpc.default_network_acl_id
+#  subnet_ids             = merge(local.subnets_private_ids, local.subnets_public_ids)
+#  ingress {
+#    protocol   = -1
+#    rule_no    = 100
+#    action     = "allow"
+#    cidr_block = "0.0.0.0/0"
+#    from_port  = 0
+#    to_port    = 0
+#  }
+#
+#  egress {
+#    protocol   = -1
+#    rule_no    = 100
+#    action     = "allow"
+#    cidr_block = "0.0.0.0/0"
+#    from_port  = 0
+#    to_port    = 0
+#  }
+#
+#  tags = {
+#    Name = "${local.projectNameForVpc}-default-network-acl"
+#  }
+#}
+resource "aws_default_security_group" "default_security_group" {
+  vpc_id = aws_vpc.vpc.id
+  ingress {
+    protocol  = -1
+    self      = true
+    from_port = 0
+    to_port   = 0
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+    # cidr_blocks = ["127.0.0.1/32"]
+  }
+
+  tags = {
+    Name = "${local.projectNameForVpc}-default-security-group"
+  }
+}
+resource "aws_security_group" "allow_tls" {
+  name        = "allow_tls"
+  description = "Allow TLS inbound traffic"
+  vpc_id      = aws_vpc.vpc.id
+
+  ingress {
+    description = "TLS from VPC"
+    from_port   = 27017
+    to_port     = 27017
+    protocol    = "tcp"
+    cidr_blocks = [aws_vpc.vpc.cidr_block]
+  }
+
+  egress {
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
+  }
+
+  tags = {
+    Name = "allow_tls"
+  }
 }

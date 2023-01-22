@@ -2,7 +2,6 @@ package service
 
 import (
 	"encoding/json"
-	"errors"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/dgrijalva/jwt-go"
 	"time"
@@ -35,11 +34,15 @@ func ValidateToken(signedToken string) (events.APIGatewayProxyResponse, error) {
 		},
 	)
 	if err != nil {
-		return events.APIGatewayProxyResponse{}, err
+		message, _ := json.Marshal(ResponseError{Error: err})
+		return events.APIGatewayProxyResponse{
+			Body:       string(message),
+			StatusCode: 401,
+		}, err
 	}
 	claims, ok := token.Claims.(*JWTClaim)
 	if !ok {
-		err = errors.New("couldn't parse claims")
+		//err = errors.New("couldn't parse claims")
 		message, _ := json.Marshal(ResponseError{Error: err})
 		return events.APIGatewayProxyResponse{
 			Body:       string(message),
@@ -47,7 +50,7 @@ func ValidateToken(signedToken string) (events.APIGatewayProxyResponse, error) {
 		}, err
 	}
 	if claims.ExpiresAt < time.Now().Local().Unix() {
-		err = errors.New("token expired")
+		//err = errors.New("token expired")
 		message, _ := json.Marshal(ResponseError{Error: err})
 		return events.APIGatewayProxyResponse{
 			Body:       string(message),
