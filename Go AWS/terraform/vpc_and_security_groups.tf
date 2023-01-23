@@ -8,10 +8,9 @@ locals {
 variable "az_number" {
   # Assign a number to each AZ letter used in our configuration
   default = {
-    a = 1
-    b = 2
-    c = 3
-    # and so on, up to n = 14 if that many letters are assigned
+    "eu-west-1a" = 1
+    "eu-west-1b" = 2
+    "eu-west-1c" = 3
   }
 }
 
